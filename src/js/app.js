@@ -1,96 +1,70 @@
 App = {
-  web3Provider: null,
-  myProfile: {},
-  contracts: {},
-  account: '0x0',
-  loading: false,
 
   init: function () {
-    console.log("App initialized...")
-    return App.initWeb3();
-  },
+    //const contract = require('truffle-contract')
+    const Web3 = require('web3')
+    const provider = new Web3.providers.HttpProvider('http://localhost:7545')
+    const web3 = new Web3(provider)
 
-  initWeb3: function () {
-    if (typeof web3 !== 'undefined') {
-      // If a web3 instance is already provided by Meta Mask.
-      App.web3Provider = web3.currentProvider;
-      web3 = new Web3(web3.currentProvider);
-    } else {
-      // Specify default instance if no web3 instance provided
-      App.web3Provider = new Web3.providers.HttpProvider('http://localhost:7545');
-      web3 = new Web3(App.web3Provider);
-    }
-    return App.initContracts();
-  },
+    const VerifierArtifact = require('ProxyWallet.json')
+    const Verifier = TruffleContract(VerifierArtifact)
+    Verifier.setProvider(provider)
 
-  initContracts: function () {
-    $.getJSON("ProxyWallet.json", function (proxyWallet) {
-      App.contracts.ProxyWallet = TruffleContract(proxyWallet);
-      App.contracts.ProxyWallet.setProvider(App.web3Provider);
-      App.contracts.ProxyWallet.deployed().then(function (proxyWallet) {
-        console.log("Contract Address:", 'https://rinkeby.etherscan.io/address/' + proxyWallet.address);
-      });
-
-      return App.render();
-    })
-  },
-
-  render: function () {
-    if (App.loading) {
-      return;
-    }
-    App.loading = true;
-
-    var loader = $('#loader');
-    var content = $('#content');
-
-    loader.show();
-    content.hide();
-
-    // Load account data
-    web3.eth.getCoinbase(function (err, account) {
-      if (err === null) {
-        App.account = account;
-        console.log("Account Address:", 'https://rinkeby.etherscan.io/address/' + account);
+    function toHex(str) {
+      var hex = '';
+      for (var i = 0; i < str.length; i++) {
+        hex += '' + str.charCodeAt(i).toString(16);
       }
-    });
-
-    App.LoadLandingPage();
-  },
-
-  LoadLandingPage: function () {
-    App.contracts.ProxyWallet.deployed().then(function (instance) {
-      ProxyWalletInstance = instance;
-      return ProxyWalletInstance.version();
-    }).then((version) => {
-      console.log("Version: " + version);
-
-      let addr = web3.eth.accounts[0]
-      console.log(addr);
-      let msg = 'I really did make this message'
-
-      let signature = web3.eth.sign(addr, '0x' + App.toHex(msg))
-
-      console.log(signature)
-    })
-  },
-
-  toHex: function (str) {
-
-    var hex = ''
-
-    for (var i = 0; i < str.length; i++) {
-
-      hex += '' + str.charCodeAt(i).toString(16)
-
+      return hex;
     }
 
-    return hex
+    const addr = web3.eth.accounts[0]
+    const msg = 'school bus'
+    const hex_msg = '0x' + toHex(msg)
+    let signature = web3.eth.sign(addr, hex_msg)
+
+    console.log(`address -----> ${addr}`)
+    console.log(`msg ---------> ${msg}`)
+    console.log(`hex(msg) ----> ${hex_msg}`)
+    console.log(`sig ---------> ${signature}`)
+
+    signature = signature.substr(2);
+    const r = '0x' + signature.slice(0, 64)
+    const s = '0x' + signature.slice(64, 128)
+    const v = '0x' + signature.slice(128, 130)
+    var v_decimal = web3.toDecimal(v)
+    if (v_decimal != 27 || v_decimal != 28) {
+      v_decimal += 27
+    }
+
+    console.log(`r -----------> ${r}`)
+    console.log(`s -----------> ${s}`)
+    console.log(`v -----------> ${v}`)
+    console.log(`vd ----------> ${v_decimal}`)
+
+    Verifier
+      .deployed()
+      .then(instance => {
+        const fixed_msg = `\x19Ethereum Signed Message:\n${msg.length}${msg}`
+        const fixed_msg_sha = web3.sha3(fixed_msg)
+        return instance.recoverAddr.call(
+          fixed_msg_sha,
+          v_decimal,
+          r,
+          s
+        )
+      })
+      .then(data => {
+        console.log('-----data------')
+        console.log(`input addr ==> ${addr}`)
+        console.log(`output addr => ${data}`)
+      })
+      .catch(e => {
+        console.log('i got an error')
+        console.log(e)
+      })
 
   }
-
-
-
 
 
 }
