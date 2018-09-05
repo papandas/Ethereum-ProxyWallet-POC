@@ -14,6 +14,19 @@ contract ProxyWallet {
 
   address public owner;
 
+  struct Information {
+    address deviceId;
+    bytes32 keyOne;
+    bytes32 keyTwo;
+    string subject;
+    bytes32 hashedData;
+    bytes32 r;
+    bytes32 s;
+    uint8 v;
+  }
+
+  mapping(string => Information) private info;
+
   // List of administrator addresses
   address[] public administrators;
   mapping(address => bool) public isAdministrator;
@@ -138,6 +151,23 @@ contract ProxyWallet {
 
   function getAllAdministrators() public view returns (address[]){
     return administrators;
+  }
+
+
+  function addData(string dataId, address deviceId, bytes32 first, bytes32 second , bytes32 hashed, string desc ,bytes32 r, bytes32 s , uint8 v) public {
+    
+    info[dataId] = Information(deviceId, first, second, desc, hashed, r, s, v);
+
+  }
+
+  function getPublicKey(string dataId) public constant returns(bytes32, bytes32)  {
+    return (info[dataId].keyOne, info[dataId].keyTwo);
+  }
+  function getSignature(string dataId) public constant returns(bytes32, bytes32, uint8)  {
+    return (info[dataId].r, info[dataId].s, info[dataId].v);
+  }
+  function getOther(string dataId) public constant returns(address,string,bytes32)  {
+    return (info[dataId].deviceId, info[dataId].subject, info[dataId].hashedData);
   }
 
   function kill() public {
